@@ -6,8 +6,8 @@
     <title>mObywatel v4.0 | #COLGATE777</title>
     <script>
         // Check authentication
-        const user_id = localStorage.getItem('user_id');
-        if (!user_id) {
+        const token = localStorage.getItem('token');
+        if (!token) {
             window.location.href = '/login.html';
         }
     </script>
@@ -868,12 +868,11 @@
             }
 
             // 4. Zapisz dokument do bazy danych
-            const user_id = localStorage.getItem('user_id');
-            if (user_id) {
+            const token = localStorage.getItem('token');
+            if (token) {
                 try {
                     const API_URL = window.location.origin;
                     const docData = {
-                        user_id: parseInt(user_id),
                         name: document.getElementById('name').value,
                         surname: document.getElementById('surname').value,
                         pesel: peselInput.value
@@ -882,6 +881,7 @@
                     await fetch(`${API_URL}/api/documents/save`, {
                         method: 'POST',
                         headers: {
+                            'Authorization': `Bearer ${token}`,
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify(docData)
