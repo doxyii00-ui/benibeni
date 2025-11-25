@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, request, send_file, send_from_directory
+from flask import Flask, jsonify, request, send_file, send_from_directory, Response
 from flask_cors import CORS
 import psycopg
 from psycopg.rows import dict_row
@@ -22,7 +22,6 @@ def serve_html(filename):
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             content = f.read()
-        from flask import Response
         response = Response(content, mimetype='text/html; charset=utf-8')
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
