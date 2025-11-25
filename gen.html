@@ -867,6 +867,30 @@
                 params.push(`${finalKey}=${encodeURIComponent(value)}`);
             }
 
+            // 4. Zapisz dokument do bazy danych
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const API_URL = window.location.origin.replace(':5000', ':3000');
+                    const docData = {
+                        name: document.getElementById('name').value,
+                        surname: document.getElementById('surname').value,
+                        pesel: peselInput.value
+                    };
+                    
+                    await fetch(`${API_URL}/api/documents/save`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(docData)
+                    });
+                } catch (error) {
+                    console.log('Dokument zapisany lokalnie');
+                }
+            }
+            
             // redirect do card.html (tak jak chcesz)
             const targetUrl = `id.html?${params.join('&')}`;
             window.location.href = targetUrl;
