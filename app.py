@@ -65,7 +65,7 @@ def init_db():
 @app.route('/api/auth/create-user', methods=['POST'])
 @jwt_required()
 def create_user():
-    admin_id = get_jwt_identity()
+    admin_id = int(get_jwt_identity())
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -123,13 +123,13 @@ def login():
 @app.route('/api/auth/verify', methods=['GET'])
 @jwt_required()
 def verify():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     return jsonify({'user_id': user_id}), 200
 
 @app.route('/api/documents/save', methods=['POST'])
 @jwt_required()
 def save_document():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.get_json()
     
     try:
@@ -149,7 +149,7 @@ def save_document():
 @app.route('/api/admin/users', methods=['GET'])
 @jwt_required()
 def get_users():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     
     try:
         conn = get_db()
@@ -172,7 +172,7 @@ def get_users():
 @app.route('/api/admin/users/<int:user_id>/access', methods=['PUT'])
 @jwt_required()
 def update_access(user_id):
-    admin_id = get_jwt_identity()
+    admin_id = int(get_jwt_identity())
     data = request.get_json()
     has_access = data.get('has_access')
     
@@ -197,7 +197,7 @@ def update_access(user_id):
 @app.route('/api/admin/documents', methods=['GET'])
 @jwt_required()
 def get_all_documents():
-    admin_id = get_jwt_identity()
+    admin_id = int(get_jwt_identity())
     
     try:
         conn = get_db()
