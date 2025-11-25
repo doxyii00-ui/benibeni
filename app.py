@@ -12,9 +12,16 @@ load_dotenv()
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# Serve HTML files with correct MIME type
+# Serve HTML files with proper caching headers
 def serve_html(filename):
-    return send_from_directory('.', filename, mimetype='text/html')
+    with open(filename, 'r', encoding='utf-8') as f:
+        content = f.read()
+    from flask import Response
+    return Response(content, mimetype='text/html', headers={
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+    })
 
 
 # Database Connection
