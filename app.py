@@ -20,15 +20,19 @@ def get_db():
 
 def init_db():
     """Initialize database with required tables"""
-    if not os.environ.get('DATABASE_URL'):
-        print("DATABASE_URL not set - skipping database initialization")
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        print("WARNING: DATABASE_URL not set - skipping database initialization")
         return
 
     try:
-        conn = get_db()
+        print(f"Connecting to database...")
+        conn = psycopg.connect(db_url)
         cur = conn.cursor()
+        print("Connection successful")
 
         # Users table
+        print("Creating users table...")
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -40,8 +44,10 @@ def init_db():
                 is_admin BOOLEAN DEFAULT FALSE
             )
         ''')
+        print("Users table created/verified")
 
         # Generated documents table
+        print("Creating generated_documents table...")
         cur.execute('''
             CREATE TABLE IF NOT EXISTS generated_documents (
                 id SERIAL PRIMARY KEY,
@@ -53,13 +59,16 @@ def init_db():
                 data JSON
             )
         ''')
+        print("Generated documents table created/verified")
 
         conn.commit()
         cur.close()
         conn.close()
-        print("Database initialized successfully")
+        print("Database initialization completed successfully!")
     except Exception as e:
-        print(f"Database initialization error: {e}")
+        print(f"ERROR: Database initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 # Serve HTML files
@@ -86,6 +95,30 @@ def gen_page():
 @app.route('/admin.html')
 def admin_page():
     return send_file('admin.html')
+
+
+# Seed database with admin user
+@app.route('/api/seed', methods=['POST'])
+def seed():
+    try:
+        conn = get_db()
+        cur = conn.cursor(row_factory=dict_row)
+        
+        # Try to create admin user
+        try:
+            cur.execute(
+                'INSERT INTO users (username, password, has_access, is_admin) VALUES (%s, %s, %s, %s)',
+                ('mamba', 'MangoMango67', True, True))
+            conn.commit()
+            print("Admin user 'mamba' created")
+        except psycopg.IntegrityError:
+            print("Admin user already exists")
+        
+        cur.close()
+        conn.close()
+        return jsonify({'message': 'Database seeded successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # Routes
