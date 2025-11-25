@@ -3,7 +3,6 @@ import os
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
@@ -12,11 +11,6 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
-
-# JWT Configuration
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET', 'your-secret-key-change-this')
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=30)
-jwt = JWTManager(app)
 
 # Database Connection
 def get_db():
@@ -63,9 +57,7 @@ def init_db():
 
 # Routes
 @app.route('/api/auth/create-user', methods=['POST'])
-@jwt_required()
 def create_user():
-    admin_id = int(get_jwt_identity())
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -76,12 +68,6 @@ def create_user():
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Check if admin
-        cur.execute('SELECT is_admin FROM users WHERE id = %s', (admin_id,))
-        user = cur.fetchone()
-        if not user or not user['is_admin']:
-            return jsonify({'error': 'Admin access required'}), 403
         
         # Create user with access enabled by default
         cur.execute('INSERT INTO users (username, password, has_access) VALUES (%s, %s, %s)', 
@@ -115,22 +101,14 @@ def login():
         if not user['has_access']:
             return jsonify({'error': 'Access denied. Contact administrator'}), 403
         
-        access_token = create_access_token(identity=str(user['id']))
-        return jsonify({'access_token': access_token, 'username': user['username']}), 200
+        return jsonify({'user_id': user['id'], 'username': user['username'], 'is_admin': user['is_admin']}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/auth/verify', methods=['GET'])
-@jwt_required()
-def verify():
-    user_id = int(get_jwt_identity())
-    return jsonify({'user_id': user_id}), 200
-
 @app.route('/api/documents/save', methods=['POST'])
-@jwt_required()
 def save_document():
-    user_id = int(get_jwt_identity())
     data = request.get_json()
+    user_id = data.get('user_id')
     
     try:
         conn = get_db()
@@ -147,19 +125,10 @@ def save_document():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/users', methods=['GET'])
-@jwt_required()
 def get_users():
-    user_id = int(get_jwt_identity())
-    
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Check if admin
-        cur.execute('SELECT is_admin FROM users WHERE id = %s', (user_id,))
-        user = cur.fetchone()
-        if not user or not user['is_admin']:
-            return jsonify({'error': 'Admin access required'}), 403
         
         cur.execute('SELECT id, username, has_access, created_at FROM users ORDER BY created_at DESC')
         users = cur.fetchall()
@@ -170,21 +139,13 @@ def get_users():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/users/<int:user_id>/access', methods=['PUT'])
-@jwt_required()
 def update_access(user_id):
-    admin_id = int(get_jwt_identity())
     data = request.get_json()
     has_access = data.get('has_access')
     
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Check if admin
-        cur.execute('SELECT is_admin FROM users WHERE id = %s', (admin_id,))
-        user = cur.fetchone()
-        if not user or not user['is_admin']:
-            return jsonify({'error': 'Admin access required'}), 403
         
         cur.execute('UPDATE users SET has_access = %s WHERE id = %s', (has_access, user_id))
         conn.commit()
@@ -195,18 +156,10 @@ def update_access(user_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/documents', methods=['GET'])
-@jwt_required()
 def get_all_documents():
-    admin_id = int(get_jwt_identity())
-    
     try:
         conn = get_db()
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        cur.execute('SELECT is_admin FROM users WHERE id = %s', (admin_id,))
-        user = cur.fetchone()
-        if not user or not user['is_admin']:
-            return jsonify({'error': 'Admin access required'}), 403
         
         cur.execute('''
             SELECT d.id, u.username, d.name, d.surname, d.pesel, d.created_at

@@ -162,8 +162,15 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Zapisz token dla admin panelu
-                    localStorage.setItem('admin_token', data.access_token);
+                    // Sprawdź czy user jest admin
+                    if (!data.is_admin) {
+                        messageDiv.className = 'error';
+                        messageDiv.textContent = 'Nie masz dostępu do panelu!';
+                        return;
+                    }
+                    // Zapisz dane dla admin panelu
+                    localStorage.setItem('admin_user_id', data.user_id);
+                    localStorage.setItem('admin_username', data.username);
                     messageDiv.className = 'success';
                     messageDiv.textContent = 'Zalogowano! Wchodzę do panelu...';
                     setTimeout(() => window.location.href = '/admin.html', 1500);

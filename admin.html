@@ -186,9 +186,10 @@
 
     <script>
         const API_URL = window.location.origin;
-        const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
+        const admin_user_id = localStorage.getItem('admin_user_id');
+        const admin_username = localStorage.getItem('admin_username');
 
-        if (!token) {
+        if (!admin_user_id) {
             window.location.href = '/admin-login.html';
         }
 
@@ -215,10 +216,7 @@
                 try {
                     const response = await fetch(`${API_URL}/api/auth/create-user`, {
                         method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ username, password })
                     });
 
@@ -241,11 +239,9 @@
 
         async function loadUsers() {
             try {
-                const response = await fetch(`${API_URL}/api/admin/users`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const response = await fetch(`${API_URL}/api/admin/users`);
 
-                if (!response.ok) throw new Error('Unauthorized');
+                if (!response.ok) throw new Error('Failed to load users');
 
                 const users = await response.json();
                 const tbody = document.querySelector('#usersTable tbody');
@@ -270,11 +266,9 @@
 
         async function loadDocuments() {
             try {
-                const response = await fetch(`${API_URL}/api/admin/documents`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const response = await fetch(`${API_URL}/api/admin/documents`);
 
-                if (!response.ok) throw new Error('Unauthorized');
+                if (!response.ok) throw new Error('Failed to load documents');
 
                 const docs = await response.json();
                 const tbody = document.querySelector('#documentsTable tbody');
@@ -297,10 +291,7 @@
             try {
                 const response = await fetch(`${API_URL}/api/admin/users/${userId}/access`, {
                     method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ has_access: hasAccess })
                 });
 
