@@ -3,9 +3,14 @@ from flask import jsonify, request, send_file
 from psycopg.rows import dict_row
 from fpdf import FPDF  # pip install fpdf
 from app import app, get_db
-from create_app import create_app
+from flask import Blueprint
 
-app = create_app()
+document_bp = Blueprint('documents', __name__)
+
+@document_bp.route('/documents')
+def list_docs():
+    return "Lista dokumentów"
+
 
 
 
