@@ -2,7 +2,12 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="mObywatel">
+    <meta name="theme-color" content="#09020e">
+    <link rel="manifest" href="/manifest.json">
     <title>mObywatel v4.0 | #COLGATE777</title>
     <script>
         // Check authentication
@@ -38,14 +43,16 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            min-height: 100dvh;
+            height: 100vh;
+            height: 100dvh;
+            height: 100svh;
             margin: 0;
-            padding: 15px;
-            padding-top: max(15px, env(safe-area-inset-top));
-            padding-bottom: max(15px, env(safe-area-inset-bottom));
+            padding: 0;
             box-sizing: border-box;
             background-image: radial-gradient(circle at top left, var(--bg-mid) 5%, transparent 40%),
                                  radial-gradient(circle at bottom right, rgba(150, 0, 255, 0.1) 0%, transparent 45%);
+            overflow: hidden;
+            position: relative;
         }
 
         .container {
@@ -59,8 +66,11 @@
             border: 1px solid var(--border-clear);
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9), 0 0 20px var(--accent-glow) inset;
             width: 100%;
-            max-width: 350px; 
-            margin-bottom: 20px; 
+            max-width: 350px;
+            max-height: 90vh;
+            max-height: 90dvh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         h1 {
