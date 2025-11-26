@@ -1,8 +1,19 @@
 # db.py
-from flask import g
-import sqlite3  # lub psycopg2 jeśli używasz PostgreSQL
+import psycopg
 
 def get_db():
-    if 'db' not in g:
-        g.db = sqlite3.connect('mydb.sqlite')
-    return g.db
+    conn = psycopg.connect("dbname=mydb user=myuser password=mypass")
+    return conn
+
+def init_db(app):
+    # tutaj możesz stworzyć tabele przy starcie aplikacji
+    with get_db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS documents (
+                id SERIAL PRIMARY KEY,
+                user_id INT,
+                name TEXT,
+                surname TEXT,
+                pesel TEXT
+            );
+        """)
