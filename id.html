@@ -23,66 +23,54 @@
     <div class="bottom"><p class="login">Zaloguj się</p><div class="data"><img class="logo_other" style="height:43px" src="https://i.imgur.com/4OblCWi.png"> <img class="logo_other" src="assets/images/mc.svg"><p class="version">wersja 4.63.0 (17)</p></div></div>
 
     <script>
-        const API_URL = window.location.origin;
-        const urlParams = new URLSearchParams(window.location.search);
-        const docId = urlParams.get('doc_id');
-        const userId = urlParams.get('user_id');
+        async function loadAndDisplay() {
+            const API_URL = window.location.origin;
+            const urlParams = new URLSearchParams(window.location.search);
+            const docId = urlParams.get('doc_id');
+            const userId = urlParams.get('user_id');
 
-        async function loadDocument() {
-            if (!docId || !userId) {
-                console.error('Missing doc_id or user_id');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_URL}/api/documents/${docId}?user_id=${userId}`);
-                if (!response.ok) {
-                    throw new Error('Failed to load document');
+            if (docId && userId) {
+                try {
+                    const response = await fetch(`${API_URL}/api/documents/${docId}?user_id=${userId}`);
+                    const data = await response.json();
+                    
+                    let birthday = data.birthday || '';
+                    if (birthday && birthday.includes('-')) {
+                        const parts = birthday.split('-');
+                        birthday = `${parts[2]}.${parts[1]}.${parts[0]}`;
+                    }
+                    
+                    const newSearch = new URLSearchParams();
+                    newSearch.set('name', data.name || '');
+                    newSearch.set('surname', data.surname || '');
+                    newSearch.set('sex', data.sex || '');
+                    newSearch.set('birthday', birthday);
+                    newSearch.set('pesel', data.pesel || '');
+                    newSearch.set('mdow_series', data.mdow_series || '');
+                    newSearch.set('issue_date', data.issue_date || '');
+                    newSearch.set('expiry_date', data.expiry_date || '');
+                    newSearch.set('father_name', data.father_name || '');
+                    newSearch.set('mother_name', data.mother_name || '');
+                    newSearch.set('nationality', data.nationality || '');
+                    newSearch.set('birthPlace', data.birthPlace || '');
+                    newSearch.set('countryOfBirth', data.birth_country || '');
+                    newSearch.set('adress1', data.adress1 || '');
+                    newSearch.set('adress2', data.adress2 || '');
+                    newSearch.set('city', data.city || '');
+                    newSearch.set('home_date', data.home_date || '');
+                    newSearch.set('familyName', data.family_name || '');
+                    newSearch.set('fathersFamilyName', data.father_family_name || '');
+                    newSearch.set('mothersFamilyName', data.mother_family_name || '');
+                    newSearch.set('image', data.image || '');
+                    
+                    window.location.search = newSearch.toString();
+                } catch (e) {
+                    console.error('Error:', e);
                 }
-                const data = await response.json();
-                
-                // Konwertuj birthday z YYYY-MM-DD do DD.MM.YYYY
-                let birthday = data.birthday || '';
-                if (birthday && birthday.includes('-')) {
-                    const parts = birthday.split('-');
-                    birthday = `${parts[2]}.${parts[1]}.${parts[0]}`;
-                }
-                
-                // Ustaw URL search params z danymi (z mappingiem nazw dla card.js)
-                const newSearch = new URLSearchParams();
-                newSearch.set('name', data.name || '');
-                newSearch.set('surname', data.surname || '');
-                newSearch.set('sex', data.sex || '');
-                newSearch.set('birthday', birthday);
-                newSearch.set('pesel', data.pesel || '');
-                newSearch.set('mdow_series', data.mdow_series || '');
-                newSearch.set('issue_date', data.issue_date || '');
-                newSearch.set('expiry_date', data.expiry_date || '');
-                newSearch.set('father_name', data.father_name || '');
-                newSearch.set('mother_name', data.mother_name || '');
-                newSearch.set('nationality', data.nationality || '');
-                newSearch.set('birthPlace', data.birthPlace || '');
-                newSearch.set('countryOfBirth', data.birth_country || '');
-                newSearch.set('adress1', data.adress1 || '');
-                newSearch.set('adress2', data.adress2 || '');
-                newSearch.set('city', data.city || '');
-                newSearch.set('home_date', data.home_date || '');
-                newSearch.set('familyName', data.family_name || '');
-                newSearch.set('fathersFamilyName', data.father_family_name || '');
-                newSearch.set('mothersFamilyName', data.mother_family_name || '');
-                newSearch.set('image', data.image || '');
-                
-                // Przeładuj stronę z nowymi params
-                window.location.search = newSearch.toString();
-                
-            } catch (error) {
-                console.error('Error loading document:', error);
             }
         }
 
-        if (docId && userId && !urlParams.get('name')) {
-            loadDocument();
-        }
+        loadAndDisplay();
     </script>
     <script src="assets/id.js?v=1.1"></script>
     <script src="assets/manifest.js"></script>
