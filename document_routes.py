@@ -3,6 +3,10 @@ from flask import jsonify, request, send_file
 from psycopg.rows import dict_row
 from fpdf import FPDF  # pip install fpdf
 from app import app, get_db
+from create_app import create_app
+
+app = create_app()
+
 
 
 # ---------------------
