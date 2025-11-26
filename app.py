@@ -7,6 +7,10 @@ import psycopg
 from psycopg.rows import dict_row
 from dotenv import load_dotenv
 from document_routes import *
+from create_app import create_app
+
+app = create_app()
+
 
 
 load_dotenv()
