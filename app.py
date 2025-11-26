@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 import os
-from dotenv import load_dotenv
+from datetime import datetime, timedelta
+from flask import Flask, jsonify, request, send_file, send_from_directory, Response
 from flask_cors import CORS
-from create_app import create_app
+import psycopg
+from dotenv import load_dotenv
+from create_app import create_app  # twoja fabryka app
+from document_routes import *  # jeśli blueprinty rejestrujesz w create_app, możesz tu nie importować
 
 load_dotenv()
 
-# Tworzymy aplikację tylko raz przez create_app
-app = create_app()
-
-# Dodajemy CORS
-CORS(app)
+app = create_app()  # Tworzymy app tylko raz
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run()
+
 
 # Serve static files from /assets/
 @app.route('/assets/<path:filename>')
