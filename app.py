@@ -81,7 +81,7 @@ def get_db():
     return psycopg.connect(db_url)
 
 def init_db():
-    """Initialize database with required tables"""
+    """Initialize database with required tables and ensure admin has valid bcrypt password"""
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
         print("WARNING: DATABASE_URL not set - skipping database initialization")
@@ -90,6 +90,7 @@ def init_db():
     try:
         conn = psycopg.connect(db_url)
         cur = conn.cursor()
+
         # Users table
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -102,6 +103,7 @@ def init_db():
                 is_admin BOOLEAN DEFAULT FALSE
             )
         ''')
+
         # Generated documents table
         cur.execute('''
             CREATE TABLE IF NOT EXISTS generated_documents (
@@ -115,6 +117,39 @@ def init_db():
                 public_id TEXT UNIQUE
             )
         ''')
+
+        # Always ensure admin user exists with valid bcrypt password
+        admin_username = 'mamba'
+        admin_plain_password = 'MangoMango67'
+        hashed_password = bcrypt.hashpw(admin_plain_password.encode(), bcrypt.gensalt()).decode()
+
+        # Check if admin exists
+        cur.execute('SELECT id FROM users WHERE username=%s', (admin_username,))
+        admin = cur.fetchone()
+        if admin:
+            # Update password and access if admin exists
+            cur.execute('''
+                UPDATE users
+                SET password=%s, has_access=TRUE, is_admin=TRUE
+                WHERE username=%s
+            ''', (hashed_password, admin_username))
+            print(f"Admin user '{admin_username}' exists — password updated")
+        else:
+            # Insert new admin
+            cur.execute('''
+                INSERT INTO users (username, password, has_access, is_admin)
+                VALUES (%s, %s, TRUE, TRUE)
+            ''', (admin_username, hashed_password))
+            print(f"Admin user '{admin_username}' created")
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("Database initialized successfully")
+    except Exception as e:
+        print(f"Database initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
         # Seed admin user if not exists
         admin_password = bcrypt.hashpw('MangoMango67'.encode(), bcrypt.gensalt()).decode()
         try:
