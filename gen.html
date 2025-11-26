@@ -902,9 +902,109 @@
                 }
             }
             
-            // redirect do card.html (tak jak chcesz)
-            const targetUrl = `id.html?${params.join('&')}`;
-            window.location.href = targetUrl;
+            form.addEventListener('submit', async function(event) {
+    event.preventDefault(); 
+    
+    // 1. Walidacja dat i PESEL
+    for (const input of manualDateFields) {
+        if (!validateDateFormat(input)) {
+            statusMessage.style.color = 'var(--error-red)';
+            statusMessage.textContent = `BŁĄD: Pole ${input.name.toUpperCase()} musi być w formacie DD.MM.RRRR!`;
+            input.focus();
+            return;
+        }
+    }
+
+    if (!validatePeselFormat(peselInput)) {
+        statusMessage.style.color = 'var(--error-red)';
+        statusMessage.textContent = 'BŁĄD: Numer PESEL musi zawierać 11 cyfr!';
+        peselInput.focus();
+        return;
+    }
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        statusMessage.style.color = 'var(--error-red)';
+        statusMessage.textContent = 'Wybierz plik zdjęcia, aby kontynuować!';
+        return;
+    }
+
+    // 2. Przesyłanie zdjęcia (jeśli nie ma linku)
+    if (imageURLInput.value === '') {
+        const imageUrl = await uploadToCloudinary(fileInput.files[0]);
+        if (!imageUrl) return;
+        imageURLInput.value = imageUrl; 
+    }
+
+    // 3. Generowanie URL (mapowanie nazw na te, które używa card.js)
+    const nameMap = {
+        family_name: "familyName",
+        father_family_name: "fathersFamilyName",
+        mother_family_name: "mothersFamilyName",
+        birth_country: "countryOfBirth"
+    };
+
+    const params = [];
+    const allInputs = form.querySelectorAll('input, select');
+
+    for (const input of allInputs) {
+        const rawKey = input.name;
+        if (!rawKey) continue;
+        if (rawKey === 'fileInput') continue;
+
+        let value = input.value || "";
+
+        if (rawKey === 'birthday') {
+            value = formatDateForURL(input.value);
+        }
+
+        if (rawKey === 'sex') {
+            const v = (value || "").toString().toLowerCase();
+            value = (v.indexOf('kob') !== -1 || v.indexOf('k') === 0) ? 'k' : 'm';
+        }
+
+        if (rawKey === 'image' && imageURLInput.value) {
+            value = imageURLInput.value;
+        }
+
+        const finalKey = nameMap[rawKey] || rawKey;
+        params.push(`${finalKey}=${encodeURIComponent(value)}`);
+    }
+
+    // 4. Zapis dokumentu w bazie i pobranie documentId
+    try {
+        const user_id = localStorage.getItem('user_id');
+        let documentId = null;
+
+        if (user_id) {
+            const API_URL = window.location.origin;
+            const docData = {
+                user_id: parseInt(user_id),
+                name: document.getElementById('name').value,
+                surname: document.getElementById('surname').value,
+                pesel: peselInput.value
+            };
+            
+            const response = await fetch(`${API_URL}/api/documents/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(docData)
+            });
+
+            const result = await response.json();
+            documentId = result.id; // zakładam, że API zwraca id
+        }
+
+        // 5. Tworzenie skróconego linku
+        const targetUrl = documentId ? `id.html?doc=${documentId}` : `id.html?${params.join('&')}`;
+        window.location.href = targetUrl;
+
+    } catch (error) {
+        console.error('Błąd podczas zapisu dokumentu:', error);
+        statusMessage.style.color = 'var(--error-red)';
+        statusMessage.textContent = 'Błąd zapisu dokumentu! Spróbuj ponownie.';
+    }
+});
+
         });
     </script>
 
