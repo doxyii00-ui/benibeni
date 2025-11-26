@@ -37,7 +37,10 @@ def serve_html(filename):
 
 # Database Connection
 def get_db():
-    return psycopg.connect(os.environ.get('DATABASE_URL'))
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        raise ValueError("DATABASE_URL not set")
+    return psycopg.connect(db_url)
 
 
 def init_db():
@@ -121,6 +124,18 @@ def login_page():
 @app.route('/gen.html')
 def gen_page():
     return serve_html('gen.html')
+
+
+@app.route('/manifest.json')
+def manifest():
+    try:
+        with open('manifest.json', 'r', encoding='utf-8') as f:
+            content = f.read()
+        response = Response(content, mimetype='application/manifest+json')
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        return response
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
 
 
 @app.route('/admin.html')
@@ -218,17 +233,40 @@ def save_document():
     try:
         conn = get_db()
         cur = conn.cursor()
+        import json
         cur.execute(
             '''
             INSERT INTO generated_documents (user_id, name, surname, pesel, data)
             VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
         ''',
             (user_id, data.get('name'), data.get('surname'), data.get('pesel'),
-             str(data)))
+             json.dumps(data)))
+        doc_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
         conn.close()
-        return jsonify({'message': 'Document saved'}), 201
+        return jsonify({'doc_id': doc_id}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/documents/<int:doc_id>', methods=['GET'])
+def get_document(doc_id):
+    user_id = request.args.get('user_id')
+    try:
+        conn = get_db()
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute(
+            'SELECT * FROM generated_documents WHERE id = %s AND user_id = %s',
+            (doc_id, user_id))
+        doc = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not doc:
+            return jsonify({'error': 'Document not found'}), 404
+        import json
+        return jsonify(json.loads(doc['data'])), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -293,5 +331,5 @@ def get_all_documents():
 init_db()
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 3000))
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
