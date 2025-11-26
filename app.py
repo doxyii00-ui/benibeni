@@ -1,23 +1,19 @@
 #!/usr/bin/env python3
 import os
-from datetime import datetime, timedelta
-from flask import Flask, jsonify, request, send_file, send_from_directory, Response
-from flask_cors import CORS
-import psycopg
-from psycopg.rows import dict_row
 from dotenv import load_dotenv
-from document_routes import *
+from flask_cors import CORS
 from create_app import create_app
-
-app = create_app()
-
-if __name__ == "__main__":
-    app.run()
 
 load_dotenv()
 
-app = Flask(__name__, static_folder='.', static_url_path='')
+# Tworzymy aplikację tylko raz przez create_app
+app = create_app()
+
+# Dodajemy CORS
 CORS(app)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
 
 # Serve static files from /assets/
 @app.route('/assets/<path:filename>')
