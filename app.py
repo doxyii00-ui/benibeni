@@ -81,7 +81,7 @@ def get_db():
     return psycopg.connect(db_url)
 
 def init_db():
-    """Initialize database with required tables and ensure admin has valid bcrypt password"""
+    """Initialize database with required tables and ensure admin user exists"""
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
         print("WARNING: DATABASE_URL not set - skipping database initialization")
@@ -91,7 +91,7 @@ def init_db():
         conn = psycopg.connect(db_url)
         cur = conn.cursor()
 
-        # Users table
+        # -------------------- Users Table --------------------
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -104,7 +104,7 @@ def init_db():
             )
         ''')
 
-        # Generated documents table
+        # -------------------- Generated Documents Table --------------------
         cur.execute('''
             CREATE TABLE IF NOT EXISTS generated_documents (
                 id SERIAL PRIMARY KEY,
@@ -118,30 +118,20 @@ def init_db():
             )
         ''')
 
-        # Always ensure admin user exists with valid bcrypt password
+        # -------------------- Seed Admin User --------------------
         admin_username = 'mamba'
         admin_plain_password = 'MangoMango67'
         hashed_password = bcrypt.hashpw(admin_plain_password.encode(), bcrypt.gensalt()).decode()
 
-        # Check if admin exists
-        cur.execute('SELECT id FROM users WHERE username=%s', (admin_username,))
-        admin = cur.fetchone()
-        if admin:
-            # Update password and access if admin exists
-            cur.execute('''
-                UPDATE users
-                SET password=%s, has_access=TRUE, is_admin=TRUE
-                WHERE username=%s
-            ''', (hashed_password, admin_username))
-            print(f"Admin user '{admin_username}' exists — password updated")
-        else:
-            # Insert new admin
-            cur.execute('''
-                INSERT INTO users (username, password, has_access, is_admin)
-                VALUES (%s, %s, TRUE, TRUE)
-            ''', (admin_username, hashed_password))
-            print(f"Admin user '{admin_username}' created")
+        cur.execute('''
+            INSERT INTO users (username, password, has_access, is_admin)
+            VALUES (%s, %s, TRUE, TRUE)
+            ON CONFLICT (username)
+            DO UPDATE SET password=EXCLUDED.password, has_access=TRUE, is_admin=TRUE
+        ''', (admin_username, hashed_password))
+        print(f"Admin user '{admin_username}' ensured with access and admin rights")
 
+        # -------------------- Commit & Close --------------------
         conn.commit()
         cur.close()
         conn.close()
@@ -150,25 +140,7 @@ def init_db():
         print(f"Database initialization failed: {e}")
         import traceback
         traceback.print_exc()
-        # Seed admin user if not exists
-        admin_password = bcrypt.hashpw('MangoMango67'.encode(), bcrypt.gensalt()).decode()
-        try:
-            cur.execute('''
-                INSERT INTO users (username, password, has_access, is_admin)
-                VALUES (%s, %s, %s, %s)
-            ''', ('mamba', admin_password, True, True))
-            conn.commit()
-            print("Admin user 'mamba' created")
-        except psycopg.IntegrityError:
-            print("Admin user 'mamba' already exists")
-        
-        cur.close()
-        conn.close()
-        print("Database initialized successfully")
-    except Exception as e:
-        print(f"Database initialization failed: {e}")
-        import traceback
-        traceback.print_exc()
+
 
 # -------------------- Auth Helpers --------------------
 def create_jwt(user_id, username, is_admin):
