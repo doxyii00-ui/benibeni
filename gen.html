@@ -902,64 +902,9 @@
                 }
             }
             
-            // 4. Wysyłamy WSZYSTKIE dane do backendu i odbieramy public_id
-try {
-    const API_URL = window.location.origin;
-
-    const fullData = {};
-    for (const input of allInputs) {
-        if (!input.name) continue;
-        fullData[input.name] = input.value;
-    }
-
-    fullData.birthday = formatDateForURL(document.getElementById('birthday').value);
-
-    const response = await fetch(`${API_URL}/api/documents/save_full`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fullData)
-    });
-
-    const result = await response.json();
-
-    if (!result.public_id) {
-        alert("Błąd serwera. Spróbuj ponownie.");
-        return;
-    }
-
-    // 5. Przekierowanie TYLKO z zaszyfrowanym ID
-    window.location.href = `id.html?doc=${result.public_id}`;
-
-} catch (error) {
-    console.error(error);
-    alert("Błąd połączenia z serwerem.");
-}
-async function sendDocument(data) {
-  try {
-    const response = await fetch('/api/documents/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-    if (!response.ok) {
-      const err = await response.json();
-      console.error('Błąd serwera:', err);
-      alert('Błąd: ' + (err.error || response.status));
-      return;
-    }
-    const result = await response.json();
-    console.log('Otrzymany public_id:', result.public_id);
-    console.log('Link:', result.link);
-    // np. przekieruj do /id.html?doc=public_id
-    window.location = `/id.html?doc=${result.public_id}`;
-  } catch (e) {
-    console.error('Fetch error:', e);
-    alert('Błąd połączenia z serwerem');
-  }
-}
-
+            // redirect do card.html (tak jak chcesz)
+            const targetUrl = `id.html?${params.join('&')}`;
+            window.location.href = targetUrl;
         });
     </script>
 
