@@ -1,19 +1,11 @@
-# db.py
-import psycopg
+# create_app.py
+from flask import Flask
+from document_routes import document_bp
 
-def get_db():
-    conn = psycopg.connect("dbname=mydb user=myuser password=mypass")
-    return conn
+def create_app():
+    app = Flask(__name__, static_folder='.', static_url_path='')
 
-def init_db(app):
-    # tutaj możesz stworzyć tabele przy starcie aplikacji
-    with get_db() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS documents (
-                id SERIAL PRIMARY KEY,
-                user_id INT,
-                name TEXT,
-                surname TEXT,
-                pesel TEXT
-            );
-        """)
+    # Rejestracja blueprintów
+    app.register_blueprint(document_bp)
+
+    return app
