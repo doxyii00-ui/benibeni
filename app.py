@@ -6,6 +6,8 @@ from flask_cors import CORS
 import psycopg
 from psycopg.rows import dict_row
 from dotenv import load_dotenv
+from document_routes import *
+
 
 load_dotenv()
 
