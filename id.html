@@ -24,11 +24,11 @@
 
     <script>
         const API_URL = window.location.origin;
+        const urlParams = new URLSearchParams(window.location.search);
         
         async function loadDocument() {
-            const params = new URLSearchParams(window.location.search);
-            const docId = params.get('doc_id');
-            const userId = params.get('user_id');
+            const docId = urlParams.get('doc_id');
+            const userId = urlParams.get('user_id');
 
             if (!docId || !userId) {
                 console.error('Missing doc_id or user_id');
@@ -42,13 +42,16 @@
                 }
                 const data = await response.json();
                 
-                // Tutaj wczytaj dane do karty ID
-                // data zawiera: name, surname, sex, birthday, pesel, mdow_series, issue_date, expiry_date, father_name, mother_name, nationality, birthPlace, birth_country, adress1, adress2, city, home_date, family_name, father_family_name, mother_family_name, image
-                
+                // Ustaw dane globalne dla id.js
                 window.cardData = data;
-                console.log('Document loaded successfully', data);
                 
-                // Załaduj assets/id.js jeśli potrzebny
+                // Zaktualizuj params aby id.js miał dostęp do danych
+                const newParams = new URLSearchParams();
+                Object.keys(data).forEach(key => {
+                    newParams.set(key, data[key]);
+                });
+                window.location.search = newParams.toString();
+                
             } catch (error) {
                 console.error('Error loading document:', error);
             }
