@@ -1,5 +1,7 @@
 # db.py
 import psycopg
+from psycopg.rows import dict_row
+
 
 def get_db():
     conn = psycopg.connect("dbname=mydb user=myuser password=mypass")
