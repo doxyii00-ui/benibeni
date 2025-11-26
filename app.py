@@ -222,25 +222,27 @@ def login():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/documents/save', methods=['POST'])
-def save_document():
-    data = request.get_json()
-    user_id = data.get('user_id')
-
+@app.route('/api/documents/download/<int:doc_id>', methods=['GET'])
+def download_document(doc_id):
     try:
         conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            '''
-            INSERT INTO generated_documents (user_id, name, surname, pesel, data)
-            VALUES (%s, %s, %s, %s, %s)
-        ''',
-            (user_id, data.get('name'), data.get('surname'), data.get('pesel'),
-             str(data)))
-        conn.commit()
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute('SELECT * FROM generated_documents WHERE id = %s', (doc_id,))
+        doc = cur.fetchone()
         cur.close()
         conn.close()
-        return jsonify({'message': 'Document saved'}), 201
+
+        if not doc:
+            return jsonify({'error': 'Document not found'}), 404
+
+        # Tutaj generujemy PDF / dokument z danych z bazy
+        # Upewniamy się, że dane pochodzą tylko z serwera, nie z URL
+        filename = f"{doc['name']}_{doc['surname']}.pdf"
+
+        # Przykładowa funkcja generująca PDF (zastąp własną implementacją)
+        pdf_path = generate_pdf_from_data(doc)  # <- implementacja po Twojej stronie
+
+        return send_file(pdf_path, as_attachment=True, download_name=filename)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
