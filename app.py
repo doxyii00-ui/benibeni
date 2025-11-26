@@ -81,17 +81,17 @@ def get_db():
     return psycopg.connect(db_url)
 
 def init_db():
-    """Initialize database with required tables and ensure admin user exists"""
+    """Initialize database and ensure admin user has access"""
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
-        print("WARNING: DATABASE_URL not set - skipping database initialization")
+        print("DATABASE_URL not set - skipping initialization")
         return
 
     try:
         conn = psycopg.connect(db_url)
         cur = conn.cursor()
 
-        # -------------------- Users Table --------------------
+        # Users table
         cur.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -104,7 +104,7 @@ def init_db():
             )
         ''')
 
-        # -------------------- Generated Documents Table --------------------
+        # Generated documents table
         cur.execute('''
             CREATE TABLE IF NOT EXISTS generated_documents (
                 id SERIAL PRIMARY KEY,
@@ -118,10 +118,10 @@ def init_db():
             )
         ''')
 
-        # -------------------- Seed Admin User --------------------
+        # Ensure admin user exists and has access
         admin_username = 'mamba'
-        admin_plain_password = 'MangoMango67'
-        hashed_password = bcrypt.hashpw(admin_plain_password.encode(), bcrypt.gensalt()).decode()
+        admin_password_plain = 'MangoMango67'
+        hashed_password = bcrypt.hashpw(admin_password_plain.encode(), bcrypt.gensalt()).decode()
 
         cur.execute('''
             INSERT INTO users (username, password, has_access, is_admin)
@@ -129,13 +129,11 @@ def init_db():
             ON CONFLICT (username)
             DO UPDATE SET password=EXCLUDED.password, has_access=TRUE, is_admin=TRUE
         ''', (admin_username, hashed_password))
-        print(f"Admin user '{admin_username}' ensured with access and admin rights")
 
-        # -------------------- Commit & Close --------------------
         conn.commit()
         cur.close()
         conn.close()
-        print("Database initialized successfully")
+        print("Database initialized, admin user ensured")
     except Exception as e:
         print(f"Database initialization failed: {e}")
         import traceback
