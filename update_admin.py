@@ -1,54 +1,48 @@
-# update_admin.py
-
+import os
 import psycopg
 import bcrypt
+from dotenv import load_dotenv
 
-# Ustaw swoje dane połączenia z bazą
-DB_HOST = "localhost"       # lub adres Twojego serwera
-DB_PORT = 5432
-DB_NAME = "nazwa_bazy"
-DB_USER = "uzytkownik"
-DB_PASSWORD = "haslo_bazy"
+load_dotenv()
 
-# Nowe hasło admina
-NEW_ADMIN_PASSWORD = "MangoMango67"
+# Pobieramy dane do połączenia z bazy
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-def update_admin_password():
-    try:
-        # Połączenie z bazą
-        with psycopg.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASSWORD
-        ) as conn:
-            with conn.cursor() as cur:
-                # Tworzymy hash hasła bcrypt
-                hashed_pw = bcrypt.hashpw(NEW_ADMIN_PASSWORD.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+# Nowe hasło dla admina
+NEW_ADMIN_PASSWORD = "MangoMango67"  # <-- ustaw tu swoje hasło
 
-                # Sprawdzamy czy użytkownik już istnieje
-                cur.execute("SELECT id FROM users WHERE username = %s", ("mamba",))
-                result = cur.fetchone()
-                
-                if result:
-                    # Aktualizujemy hasło
-                    cur.execute(
-                        "UPDATE users SET password = %s WHERE username = %s",
-                        (hashed_pw, "mamba")
-                    )
-                    print("Hasło admina zostało zaktualizowane!")
-                else:
-                    # Tworzymy nowego admina
-                    cur.execute(
-                        "INSERT INTO users (username, password, has_access, is_admin) VALUES (%s, %s, %s, %s)",
-                        ("mamba", hashed_pw, True, True)
-                    )
-                    print("Admin 'mamba' został utworzony!")
+# Funkcja generująca hash zgodny z bcrypt
+def generate_bcrypt_hash(password: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
-                conn.commit()
-    except Exception as e:
-        print("Wystąpił błąd:", e)
+hashed_password = generate_bcrypt_hash(NEW_ADMIN_PASSWORD)
 
-if __name__ == "__main__":
-    update_admin_password()
+# Aktualizacja admina w bazie
+with psycopg.connect(
+    host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD
+) as conn:
+    with conn.cursor() as cur:
+        # Sprawdź czy admin istnieje
+        cur.execute("SELECT id FROM admins WHERE username = 'mamba'")
+        if cur.rowcount == 0:
+            # Tworzymy admina jeśli nie istnieje
+            cur.execute(
+                "INSERT INTO admins (username, password) VALUES (%s, %s)",
+                ("mamba", hashed_password)
+            )
+            print("Admin 'mamba' utworzony.")
+        else:
+            # Nadpisujemy hasło
+            cur.execute(
+                "UPDATE admins SET password = %s WHERE username = 'mamba'",
+                (hashed_password,)
+            )
+            print("Hasło admina 'mamba' zaktualizowane.")
+
+print("Gotowe! Teraz możesz się zalogować używając nowego hasła.")
