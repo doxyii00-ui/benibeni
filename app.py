@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from psycopg.rows import dict_row
 import os
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request, send_file, send_from_directory, Response
