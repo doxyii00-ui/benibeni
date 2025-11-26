@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
 import os
+import json
+import secrets
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, request, send_file, send_from_directory, Response
+
+from flask import Flask, jsonify, request, send_from_directory, Response
 from flask_cors import CORS
 import psycopg
 from psycopg.rows import dict_row
 from dotenv import load_dotenv
+import bcrypt
+import jwt
 
 load_dotenv()
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# Serve static files from /assets/
+JWT_SECRET = os.environ.get('JWT_SECRET', 'supersecretkey')  # zmień w produkcji
+JWT_ALGORITHM = 'HS256'
+JWT_EXP_DAYS = 7
+
+# -------------------- Static Files --------------------
 @app.route('/assets/<path:filename>')
 def serve_assets(filename):
     try:
@@ -20,7 +29,6 @@ def serve_assets(filename):
     except Exception as e:
         return jsonify({'error': str(e)}), 404
 
-# Serve HTML files with proper caching headers
 def serve_html(filename):
     try:
         with open(filename, 'r', encoding='utf-8') as f:
@@ -34,104 +42,21 @@ def serve_html(filename):
     except Exception as e:
         return jsonify({'error': f'Cannot load {filename}: {str(e)}'}), 500
 
-
-# Database Connection
-def get_db():
-    db_url = os.environ.get('DATABASE_URL')
-    if not db_url:
-        raise ValueError("DATABASE_URL not set")
-    return psycopg.connect(db_url)
-
-
-def init_db():
-    """Initialize database with required tables"""
-    db_url = os.environ.get('DATABASE_URL')
-    if not db_url:
-        print("WARNING: DATABASE_URL not set - skipping database initialization")
-        return
-
-    try:
-        print(f"Connecting to database...")
-        conn = psycopg.connect(db_url)
-        cur = conn.cursor()
-        print("Connection successful")
-
-        # Users table
-        print("Creating users table...")
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(255) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                email VARCHAR(255),
-                has_access BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_admin BOOLEAN DEFAULT FALSE
-            )
-        ''')
-        print("Users table created/verified")
-
-        # Generated documents table
-        print("Creating generated_documents table...")
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS generated_documents (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id),
-                name VARCHAR(255),
-                surname VARCHAR(255),
-                pesel VARCHAR(11),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                data JSON
-            )
-        ''')
-        print("Generated documents table created/verified")
-                # ADD public_id for secure external links
-        print("Ensuring public_id column exists...")
-        cur.execute('''
-            ALTER TABLE generated_documents
-            ADD COLUMN IF NOT EXISTS public_id TEXT UNIQUE
-        ''')
-        print("public_id column OK")
-
-        # Seed admin user if not exists
-        print("Checking for admin user...")
-        try:
-            cur.execute('INSERT INTO users (username, password, has_access, is_admin) VALUES (%s, %s, %s, %s)',
-                       ('mamba', 'MangoMango67', True, True))
-            conn.commit()
-            print("✓ Admin user 'mamba' created successfully!")
-        except psycopg.IntegrityError:
-            print("✓ Admin user 'mamba' already exists")
-        
-        cur.close()
-        conn.close()
-        print("✓ Database initialization completed successfully!")
-    except Exception as e:
-        print(f"ERROR: Database initialization failed: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-# Serve HTML files with correct MIME types
 @app.route('/')
 def index():
     return serve_html('admin-login.html')
-
 
 @app.route('/admin-login.html')
 def admin_login_page():
     return serve_html('admin-login.html')
 
-
 @app.route('/login.html')
 def login_page():
     return serve_html('login.html')
 
-
 @app.route('/gen.html')
 def gen_page():
     return serve_html('gen.html')
-
 
 @app.route('/manifest.json')
 def manifest():
@@ -144,37 +69,113 @@ def manifest():
     except Exception as e:
         return jsonify({'error': str(e)}), 404
 
-
 @app.route('/admin.html')
 def admin_page():
     return serve_html('admin.html')
 
+# -------------------- Database --------------------
+def get_db():
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        raise ValueError("DATABASE_URL not set")
+    return psycopg.connect(db_url)
 
-# Seed database with admin user
-@app.route('/api/seed', methods=['POST'])
-def seed():
+def init_db():
+    """Initialize database with required tables"""
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        print("WARNING: DATABASE_URL not set - skipping database initialization")
+        return
+
     try:
-        conn = get_db()
-        cur = conn.cursor(row_factory=dict_row)
-        
-        # Try to create admin user
+        conn = psycopg.connect(db_url)
+        cur = conn.cursor()
+        # Users table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(255) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                email VARCHAR(255),
+                has_access BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_admin BOOLEAN DEFAULT FALSE
+            )
+        ''')
+        # Generated documents table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS generated_documents (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                name VARCHAR(255),
+                surname VARCHAR(255),
+                pesel VARCHAR(11),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                data JSON,
+                public_id TEXT UNIQUE
+            )
+        ''')
+        # Seed admin user if not exists
+        admin_password = bcrypt.hashpw('MangoMango67'.encode(), bcrypt.gensalt()).decode()
         try:
-            cur.execute(
-                'INSERT INTO users (username, password, has_access, is_admin) VALUES (%s, %s, %s, %s)',
-                ('mamba', 'MangoMango67', True, True))
+            cur.execute('''
+                INSERT INTO users (username, password, has_access, is_admin)
+                VALUES (%s, %s, %s, %s)
+            ''', ('mamba', admin_password, True, True))
             conn.commit()
             print("Admin user 'mamba' created")
         except psycopg.IntegrityError:
-            print("Admin user already exists")
+            print("Admin user 'mamba' already exists")
         
         cur.close()
         conn.close()
-        return jsonify({'message': 'Database seeded successfully'}), 200
+        print("Database initialized successfully")
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Database initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
 
+# -------------------- Auth Helpers --------------------
+def create_jwt(user_id, username, is_admin):
+    payload = {
+        'user_id': user_id,
+        'username': username,
+        'is_admin': is_admin,
+        'exp': datetime.utcnow() + timedelta(days=JWT_EXP_DAYS)
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return token
 
-# Routes
+def decode_jwt(token):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+def auth_required(admin_only=False):
+    """Decorator to protect routes"""
+    from functools import wraps
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            auth_header = request.headers.get('Authorization')
+            if not auth_header or not auth_header.startswith('Bearer '):
+                return jsonify({'error': 'Authorization header missing'}), 401
+            token = auth_header.split(' ')[1]
+            payload = decode_jwt(token)
+            if not payload:
+                return jsonify({'error': 'Invalid or expired token'}), 401
+            if admin_only and not payload.get('is_admin'):
+                return jsonify({'error': 'Admin access required'}), 403
+            request.user = payload
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+# -------------------- Auth Routes --------------------
 @app.route('/api/auth/create-user', methods=['POST'])
 def create_user():
     data = request.get_json()
@@ -184,14 +185,14 @@ def create_user():
     if not username or not password:
         return jsonify({'error': 'Username and password required'}), 400
 
+    hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     try:
         conn = get_db()
-        cur = conn.cursor(row_factory=dict_row)
-
-        # Create user with access enabled by default
+        cur = conn.cursor()
         cur.execute(
             'INSERT INTO users (username, password, has_access) VALUES (%s, %s, %s)',
-            (username, password, True))
+            (username, hashed_password, True)
+        )
         conn.commit()
         cur.close()
         conn.close()
@@ -200,7 +201,6 @@ def create_user():
         return jsonify({'error': 'Username already exists'}), 409
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
@@ -211,114 +211,85 @@ def login():
     try:
         conn = get_db()
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute('SELECT * FROM users WHERE username = %s', (username, ))
+        cur.execute('SELECT * FROM users WHERE username = %s', (username,))
         user = cur.fetchone()
         cur.close()
         conn.close()
 
-        if not user or user['password'] != password:
+        if not user or not bcrypt.checkpw(password.encode(), user['password'].encode()):
             return jsonify({'error': 'Invalid credentials'}), 401
-
         if not user['has_access']:
-            return jsonify({'error':
-                            'Access denied. Contact administrator'}), 403
+            return jsonify({'error': 'Access denied'}), 403
 
-        return jsonify({
-            'user_id': user['id'],
-            'username': user['username'],
-            'is_admin': user['is_admin']
-        }), 200
+        token = create_jwt(user['id'], user['username'], user['is_admin'])
+        return jsonify({'token': token, 'user': {'id': user['id'], 'username': user['username'], 'is_admin': user['is_admin']}}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
+# -------------------- Documents --------------------
 @app.route('/api/documents/save', methods=['POST'])
+@auth_required()
 def save_document():
     data = request.get_json()
-    user_id = data.get('user_id')
-
+    user_id = request.user['user_id']
     try:
-        import json, secrets
-        public_id = secrets.token_urlsafe(16)   # ADDED — secure link ID
-
+        public_id = secrets.token_urlsafe(16)
         conn = get_db()
         cur = conn.cursor()
-
-        cur.execute(
-            '''
+        cur.execute('''
             INSERT INTO generated_documents (user_id, name, surname, pesel, data, public_id)
             VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING public_id
-            ''',
-            (user_id, data.get('name'), data.get('surname'),
-             data.get('pesel'), json.dumps(data), public_id)
-        )
-
+        ''', (user_id, data.get('name'), data.get('surname'),
+              data.get('pesel'), json.dumps(data), public_id))
         public_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
         conn.close()
-
         return jsonify({'public_id': public_id}), 201
-
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-# ADDED FOR SECURE PUBLIC LINKS ###
-@app.route('/api/public/<public_id>', methods=['GET'])
-def get_public_document(public_id):
-    try:
-        conn = get_db()
-        cur = conn.cursor(row_factory=dict_row)
-
-        cur.execute(
-            'SELECT data FROM generated_documents WHERE public_id = %s',
-            (public_id,)
-        )
-        row = cur.fetchone()
-
-        cur.close()
-        conn.close()
-
-        if not row:
-            return jsonify({'error': 'Not found'}), 404
-
-        import json
-        return jsonify(json.loads(row['data'])), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/documents/<int:doc_id>', methods=['GET'])
+@auth_required()
 def get_document(doc_id):
-    user_id = request.args.get('user_id')
+    user_id = request.user['user_id']
     try:
         conn = get_db()
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute(
-            'SELECT * FROM generated_documents WHERE id = %s AND user_id = %s',
-            (doc_id, user_id))
+        cur.execute('SELECT * FROM generated_documents WHERE id = %s AND user_id = %s', (doc_id, user_id))
         doc = cur.fetchone()
         cur.close()
         conn.close()
         if not doc:
             return jsonify({'error': 'Document not found'}), 404
-        import json
         return jsonify(json.loads(doc['data'])), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/public/<public_id>', methods=['GET'])
+def get_public_document(public_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute('SELECT data FROM generated_documents WHERE public_id = %s', (public_id,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not row:
+            return jsonify({'error': 'Not found'}), 404
+        return jsonify(json.loads(row['data'])), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
+# -------------------- Admin Routes --------------------
 @app.route('/api/admin/users', methods=['GET'])
+@auth_required(admin_only=True)
 def get_users():
     try:
         conn = get_db()
         cur = conn.cursor(row_factory=dict_row)
-
-        cur.execute(
-            'SELECT id, username, has_access, created_at FROM users ORDER BY created_at DESC'
-        )
+        cur.execute('SELECT id, username, has_access, created_at FROM users ORDER BY created_at DESC')
         users = cur.fetchall()
         cur.close()
         conn.close()
@@ -326,18 +297,15 @@ def get_users():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/admin/users/<int:user_id>/access', methods=['PUT'])
+@auth_required(admin_only=True)
 def update_access(user_id):
     data = request.get_json()
     has_access = data.get('has_access')
-
     try:
         conn = get_db()
-        cur = conn.cursor(row_factory=dict_row)
-
-        cur.execute('UPDATE users SET has_access = %s WHERE id = %s',
-                    (has_access, user_id))
+        cur = conn.cursor()
+        cur.execute('UPDATE users SET has_access = %s WHERE id = %s', (has_access, user_id))
         conn.commit()
         cur.close()
         conn.close()
@@ -345,13 +313,12 @@ def update_access(user_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/admin/documents', methods=['GET'])
+@auth_required(admin_only=True)
 def get_all_documents():
     try:
         conn = get_db()
         cur = conn.cursor(row_factory=dict_row)
-
         cur.execute('''
             SELECT d.id, u.username, d.name, d.surname, d.pesel, d.created_at
             FROM generated_documents d
@@ -365,8 +332,7 @@ def get_all_documents():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
-# Initialize database on startup (before gunicorn starts)
+# -------------------- Startup --------------------
 init_db()
 
 if __name__ == '__main__':
