@@ -85,6 +85,13 @@ def init_db():
             )
         ''')
         print("Generated documents table created/verified")
+                # ADD public_id for secure external links
+        print("Ensuring public_id column exists...")
+        cur.execute('''
+            ALTER TABLE generated_documents
+            ADD COLUMN IF NOT EXISTS public_id TEXT UNIQUE
+        ''')
+        print("public_id column OK")
 
         # Seed admin user if not exists
         print("Checking for admin user...")
@@ -231,22 +238,54 @@ def save_document():
     user_id = data.get('user_id')
 
     try:
+        import json, secrets
+        public_id = secrets.token_urlsafe(16)   # ADDED — secure link ID
+
         conn = get_db()
         cur = conn.cursor()
-        import json
+
         cur.execute(
             '''
-            INSERT INTO generated_documents (user_id, name, surname, pesel, data)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id
-        ''',
-            (user_id, data.get('name'), data.get('surname'), data.get('pesel'),
-             json.dumps(data)))
-        doc_id = cur.fetchone()[0]
+            INSERT INTO generated_documents (user_id, name, surname, pesel, data, public_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            RETURNING public_id
+            ''',
+            (user_id, data.get('name'), data.get('surname'),
+             data.get('pesel'), json.dumps(data), public_id)
+        )
+
+        public_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
         conn.close()
-        return jsonify({'doc_id': doc_id}), 201
+
+        return jsonify({'public_id': public_id}), 201
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ADDED FOR SECURE PUBLIC LINKS ###
+@app.route('/api/public/<public_id>', methods=['GET'])
+def get_public_document(public_id):
+    try:
+        conn = get_db()
+        cur = conn.cursor(row_factory=dict_row)
+
+        cur.execute(
+            'SELECT data FROM generated_documents WHERE public_id = %s',
+            (public_id,)
+        )
+        row = cur.fetchone()
+
+        cur.close()
+        conn.close()
+
+        if not row:
+            return jsonify({'error': 'Not found'}), 404
+
+        import json
+        return jsonify(json.loads(row['data'])), 200
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
